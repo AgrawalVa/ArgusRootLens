@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RootLens — AI Observability Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0D1B2E;
+  --navy2:#132338;
+  --navy3:#1A2F47;
+  --green:#00C864;
+  --green2:#00A050;
+  --green3:#007A3D;
+  --dim:#8FA8C0;
+  --dimmer:#4A6278;
+  --white:#F0F6FF;
+  --card:#131F2E;
+  --card2:#192840;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'DM Sans',sans-serif;
+  --display:'Syne',sans-serif;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--navy);color:var(--white)}
+body{font-family:var(--sans);font-size:16px}
+
+#deck{position:fixed;inset:0;display:flex;flex-direction:column}
+#progress{position:absolute;top:0;left:0;height:2px;background:var(--green);transition:width .5s cubic-bezier(.4,0,.2,1);z-index:100;box-shadow:0 0 12px rgba(0,200,100,.5)}
+#counter{position:absolute;top:20px;right:28px;font-family:var(--mono);font-size:11px;color:var(--dimmer);letter-spacing:.08em;z-index:100}
+#counter span{color:var(--green)}
+#hints{position:absolute;bottom:20px;right:28px;display:flex;gap:10px;z-index:100}
+.hint{font-family:var(--mono);font-size:10px;color:var(--dimmer);display:flex;align-items:center;gap:4px}
+.key{border:1px solid var(--dimmer);border-radius:3px;padding:1px 5px;font-size:9px;color:var(--dimmer)}
+#dots{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:100;align-items:center}
+.dot{-webkit-appearance:none;appearance:none;width:6px;height:6px;border-radius:50%;background:var(--dimmer);cursor:pointer;transition:all .3s;border:none;padding:0;outline:none;flex-shrink:0;display:block}
+.dot:hover{background:rgba(0,200,100,.6)}
+.dot.active{background:var(--green);width:20px;border-radius:3px}
+
+#slides{flex:1;position:relative;overflow:hidden}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:56px 80px 56px;opacity:0;transform:translateX(60px);transition:opacity .55s cubic-bezier(.4,0,.2,1),transform .55s cubic-bezier(.4,0,.2,1);pointer-events:none}
+.slide.active{opacity:1;transform:translateX(0);pointer-events:all}
+.slide.exit-left{opacity:0;transform:translateX(-60px)}
+
+.slide.active .reveal{animation:revealUp .5s cubic-bezier(.4,0,.2,1) both}
+.reveal{opacity:0}
+@keyframes revealUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.r1{animation-delay:.05s!important}.r2{animation-delay:.14s!important}.r3{animation-delay:.23s!important}
+.r4{animation-delay:.32s!important}.r5{animation-delay:.41s!important}.r6{animation-delay:.50s!important}
+.r7{animation-delay:.59s!important}
+
+/* typography */
+.slide-tag{font-family:var(--mono);font-size:10px;color:var(--green);letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px}
+.slide-tag span{color:var(--dimmer)}
+h1{font-family:var(--display);font-size:clamp(46px,6.5vw,82px);font-weight:800;line-height:.93;letter-spacing:-.03em;color:var(--white)}
+h1 em{color:var(--green);font-style:normal}
+h2{font-family:var(--display);font-size:clamp(26px,3.6vw,46px);font-weight:700;line-height:1.02;letter-spacing:-.02em}
+h2 em{color:var(--green);font-style:normal}
+h3{font-family:var(--display);font-size:clamp(13px,1.6vw,17px);font-weight:600;letter-spacing:-.01em}
+.green-rule{width:36px;height:3px;background:var(--green);border-radius:2px;margin:18px 0}
+.tag-pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;letter-spacing:.07em;color:var(--green);border:1px solid rgba(0,200,100,.28);border-radius:20px;padding:4px 11px;background:rgba(0,200,100,.05)}
+.chip{display:inline-flex;font-family:var(--mono);font-size:9px;color:rgba(0,200,100,.8);border:1px solid rgba(0,200,100,.22);border-radius:4px;padding:3px 8px;background:rgba(0,200,100,.05)}
+
+/* card */
+.card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),transparent)}
+.card .ci{width:34px;height:34px;background:rgba(0,200,100,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:17px}
+.card h3{font-size:clamp(12px,1.4vw,15px);margin-bottom:7px}
+.card p{font-size:clamp(10px,1.1vw,12.5px);color:var(--dim);line-height:1.6}
+.card .cs{font-family:var(--mono);font-size:9.5px;color:var(--green);margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:22px}
+
+/* bg */
+.bg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+.bg-glow{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.content{position:relative;z-index:1;width:100%}
+
+/* stat row */
+.stat-row{display:flex;gap:16px;margin-top:24px}
+.stat-box{flex:1;background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 18px}
+.stat-box .sb-val{font-family:var(--display);font-size:clamp(20px,2.8vw,30px);font-weight:800;color:var(--green)}
+.stat-box .sb-label{font-size:10.5px;color:var(--dim);margin-top:2px}
+
+/* ─── SLIDE 1 hero ─── */
+#s1 .bg-glow.g1{width:480px;height:480px;background:rgba(0,168,80,.11);top:-120px;right:-80px}
+#s1 .bg-glow.g2{width:280px;height:280px;background:rgba(0,80,200,.07);bottom:-60px;left:80px}
+#s1 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--green);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+#s1 .eyebrow::before{content:'';width:22px;height:1px;background:var(--green)}
+#s1 .hero-sub{font-size:clamp(13px,1.45vw,17px);color:var(--dim);font-weight:300;max-width:540px;line-height:1.65;margin:12px 0 26px}
+#s1 .pill-row{display:flex;gap:7px;flex-wrap:wrap}
+#s1 .built-on{margin-top:28px;font-family:var(--mono);font-size:10px;color:var(--dimmer);letter-spacing:.08em}
+#s1 .year{position:absolute;bottom:46px;right:80px;font-family:var(--mono);font-size:10px;color:var(--dimmer);border:1px solid var(--dimmer);border-radius:4px;padding:3px 9px}
+
+/* ─── SLIDE 2 problem ─── */
+#s2 .bg-glow.g1{width:380px;height:380px;background:rgba(200,50,50,.06);top:50%;right:-60px;transform:translateY(-50%)}
+
+/* ─── SLIDE 3 — HOW IT WORKS (agent flow) ─── */
+#s3 .bg-glow.g1{width:500px;height:300px;background:rgba(0,200,100,.07);bottom:-40px;left:50%;transform:translateX(-50%)}
+
+/* vertical agent pipeline */
+.pipeline{display:flex;gap:32px;margin-top:20px;align-items:flex-start}
+.pipe-col{display:flex;flex-direction:column;align-items:center;gap:0;flex-shrink:0;min-width:170px}
+.pipe-node{width:100%;background:var(--card2);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;text-align:center;position:relative}
+.pipe-node.highlight{border-color:rgba(0,200,100,.5);background:rgba(0,200,100,.06)}
+.pipe-node.tool-node{border-color:rgba(0,200,100,.2);background:var(--card)}
+.pipe-node .pn-label{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--dimmer);margin-bottom:3px}
+.pipe-node .pn-name{font-family:var(--display);font-size:clamp(11px,1.3vw,13px);font-weight:600;color:var(--white)}
+.pipe-node .pn-sub{font-family:var(--mono);font-size:8px;color:var(--dim);margin-top:3px}
+.pipe-arrow{width:2px;height:18px;background:linear-gradient(var(--green),rgba(0,200,100,.2));margin:0 auto;flex-shrink:0}
+.pipe-arrow-tip{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid rgba(0,200,100,.5);margin:0 auto;flex-shrink:0}
+
+/* tool fork */
+.tool-fork{display:flex;flex-direction:column;gap:0;flex:1}
+.fork-label{font-family:var(--mono);font-size:9px;color:var(--dimmer);letter-spacing:.1em;margin-bottom:10px;padding-left:2px}
+.fork-row{display:flex;gap:8px}
+.fork-connector{display:flex;flex-direction:column;align-items:center;margin-right:4px;flex-shrink:0}
+.fork-vline{width:1px;background:rgba(0,200,100,.25);flex:1}
+.fork-hline{width:12px;height:1px;background:rgba(0,200,100,.25);align-self:flex-start;margin-top:0}
+.tool-card{flex:1;background:var(--card);border:1px solid rgba(0,200,100,.18);border-radius:8px;padding:10px 12px}
+.tool-card .tc-tag{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--green);margin-bottom:4px}
+.tool-card .tc-name{font-family:var(--display);font-size:clamp(11px,1.3vw,13px);font-weight:600;color:var(--white);margin-bottom:3px}
+.tool-card .tc-query{font-family:var(--mono);font-size:8px;color:var(--dimmer)}
+.tool-card p{font-size:10px;color:var(--dim);line-height:1.5;margin-top:4px}
+
+/* output cards on the right */
+.pipe-outputs{display:flex;flex-direction:column;gap:8px;flex:1;justify-content:center}
+.out-card{background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 14px}
+.out-card.primary{border-color:rgba(0,200,100,.35)}
+.out-card .oc-tag{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--green);margin-bottom:3px}
+.out-card h4{font-family:var(--display);font-size:clamp(11px,1.3vw,13px);font-weight:600;color:var(--white);margin-bottom:3px}
+.out-card p{font-size:10px;color:var(--dim);line-height:1.5}
+
+/* ─── SLIDE 4 solution arch ─── */
+#s4 .bg-glow.g1{width:560px;height:280px;background:rgba(0,200,100,.06);bottom:0;left:50%;transform:translateX(-50%)}
+.arch-flow{display:flex;align-items:center;gap:10px;margin-top:22px}
+.src-stack{display:flex;flex-direction:column;gap:7px;flex-shrink:0}
+.src-node{padding:8px 13px;border-radius:8px;text-align:center}
+.src-node .sl{font-family:var(--mono);font-size:8px;letter-spacing:.1em;margin-bottom:2px}
+.src-node .sn{font-family:var(--display);font-size:12px;font-weight:600;color:#fff}
+.arr-col{display:flex;flex-direction:column;justify-content:space-around;gap:7px;padding:0 4px}
+.arr-h{color:var(--green);font-size:15px;line-height:1}
+.agent-box{background:var(--navy2);border:1px solid rgba(0,200,100,.42);border-radius:13px;padding:14px 16px;flex:1;text-align:center;position:relative}
+.agent-box::before{content:'';position:absolute;inset:0;border-radius:13px;background:radial-gradient(ellipse at 50% 0%,rgba(0,200,100,.06),transparent 70%)}
+.agent-box .ab-name{font-family:var(--display);font-size:clamp(14px,1.8vw,19px);font-weight:700;color:var(--green);margin-bottom:4px;position:relative}
+.agent-box .ab-sub{font-family:var(--mono);font-size:8px;color:var(--dim);position:relative}
+.agent-box .ab-feats{display:flex;flex-direction:column;gap:4px;margin-top:10px;position:relative}
+.agent-box .ab-feat{font-family:var(--mono);font-size:8.5px;color:var(--dim);display:flex;align-items:center;gap:5px;justify-content:center}
+.agent-box .ab-feat::before{content:'›';color:var(--green)}
+.out-stack{display:flex;flex-direction:column;gap:7px;flex-shrink:0}
+.out-node{padding:8px 13px;border-radius:8px;text-align:center;font-family:var(--display);font-size:11px;font-weight:600}
+.tech-aside{background:var(--card2);border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:10px 12px;text-align:center;flex-shrink:0}
+.tech-aside .ta-pow{font-family:var(--mono);font-size:7px;color:var(--dimmer);letter-spacing:.1em;margin-bottom:5px}
+.tech-aside .ta-name{font-family:var(--display);font-size:12px;font-weight:700;color:var(--green);margin-bottom:3px}
+.tech-aside .ta-sub{font-family:var(--mono);font-size:8px;color:var(--dim)}
+
+/* ─── SLIDE 5 outcomes ─── */
+#s5 .bg-glow.g1{width:340px;height:340px;background:rgba(0,200,100,.07);top:-90px;left:50%;transform:translateX(-50%)}
+
+/* ─── SLIDE 6 vision ─── */
+#s6 .bg-glow.g1{width:460px;height:280px;background:rgba(0,80,200,.07);bottom:-40px;right:-80px}
+.vision-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin-top:20px}
+.v-core{background:var(--card2);border:1px solid rgba(0,200,100,.35);border-radius:13px;padding:18px;text-align:center}
+.v-core-name{font-family:var(--display);font-size:clamp(14px,1.8vw,18px);font-weight:700;color:var(--green);margin:6px 0 3px}
+.v-core-sub{font-family:var(--mono);font-size:8px;color:var(--dim)}
+.v-ext{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:16px}
+.v-ext-tag{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--green);margin-bottom:5px}
+.v-ext h4{font-family:var(--display);font-size:clamp(12px,1.4vw,14px);font-weight:600;color:var(--white);margin-bottom:5px}
+.v-ext p{font-size:10.5px;color:var(--dim);line-height:1.55}
+.v-arrow{font-size:18px;color:var(--green);text-align:center;opacity:.7}
+.chip-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:9px}
+.v-mid{display:flex;flex-direction:column;gap:10px}
+
+/* ─── SLIDE 7 close ─── */
+#s7{justify-content:center;align-items:flex-start}
+#s7 .bg-glow.g1{width:640px;height:480px;background:rgba(0,200,100,.08);top:50%;left:50%;transform:translate(-10%,-50%)}
+#s7 h1{font-size:clamp(38px,5.5vw,72px)}
+#s7 .close-sub{font-size:clamp(13px,1.5vw,17px);color:var(--dim);max-width:500px;line-height:1.65;margin:14px 0 28px;font-weight:300}
+#s7 .footer-line{position:absolute;bottom:44px;font-family:var(--mono);font-size:9.5px;color:var(--dimmer)}
+</style>
+</head>
+<body>
+<div id="deck">
+  <div id="progress"></div>
+  <div id="counter"><span id="cur-num">1</span> / <span id="tot-num">8</span></div>
+  <div id="dots"></div>
+  <div id="hints">
+    <div class="hint"><span class="key">←</span><span class="key">→</span></div>
+    <div class="hint"><span class="key">F</span> fullscreen</div>
+  </div>
+
+  <div id="slides">
+
+    <!-- ══════════ S1: HERO ══════════ -->
+    <div class="slide active" id="s1">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="bg-glow g2"></div>
+      <div class="content">
+        <div class="eyebrow reveal r1">HACKATHON 2026 — OBSERVABILITY TRACK</div>
+        <h1 class="reveal r2">Root<em>Lens</em></h1>
+        <div class="hero-sub reveal r3">An AI reasoning layer that augments Grafana with contextual incident intelligence — correlating telemetry, service docs, and incident history to produce grounded, auditable answers for every stakeholder.</div>
+        <div class="pill-row reveal r4">
+          <span class="tag-pill">Mimir</span>
+          <span class="tag-pill">Loki</span>
+          <span class="tag-pill">Tempo</span>
+          <span class="tag-pill">Grafana API</span>
+          <span class="tag-pill">AKS</span>
+          <span class="tag-pill">Azure AI Foundry</span>
+          <span class="tag-pill">Azure AI Search</span>
+        </div>
+        <div class="built-on reveal r5">PLATFORM ENGINEERING · SRE · ARGUS OBSERVABILITY PLATFORM</div>
+      </div>
+      <div class="year reveal r6">2026</div>
+    </div>
+
+    <!-- ══════════ S2: PROBLEM ══════════ -->
+    <div class="slide" id="s2">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="content">
+        <div class="slide-tag reveal r1"><span>01 /</span> THE PROBLEM</div>
+        <h2 class="reveal r2">SREs are drowning<br>in disconnected signals.</h2>
+        <div class="green-rule reveal r3"></div>
+        <div class="grid-3 reveal r4">
+          <div class="card">
+            <div class="ci">📡</div>
+            <h3>Signal overload</h3>
+            <p>Metrics in Mimir, logs in Loki, traces in Tempo — three separate tools, zero automatic correlation during an incident.</p>
+            <div class="cs">→ Hours of manual pivoting per incident</div>
+          </div>
+          <div class="card">
+            <div class="ci">⏱</div>
+            <h3>Slow root cause</h3>
+            <p>Manual correlation is a skill that takes years to build. Junior engineers freeze under pressure. MTTR stays unacceptably high.</p>
+            <div class="cs">→ Tribal knowledge, not repeatable process</div>
+          </div>
+          <div class="card">
+            <div class="ci">🔇</div>
+            <h3>Context lost</h3>
+            <p>Post-incident knowledge evaporates. The next similar incident starts from scratch with no institutional memory.</p>
+            <div class="cs">→ No signal-level learning between incidents</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ S3: HOW IT WORKS — AGENT FLOW ══════════ -->
+    <div class="slide" id="s3">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="content">
+        <div class="slide-tag reveal r1"><span>02 /</span> HOW IT WORKS</div>
+        <h2 class="reveal r2">From question to<br><em>root cause</em> — automatically.</h2>
+        <div class="green-rule reveal r3"></div>
+
+        <div class="pipeline reveal r4">
+
+          <!-- LEFT: vertical pipeline -->
+          <div class="pipe-col">
+            <div class="pipe-node highlight">
+              <div class="pn-label">INPUT</div>
+              <div class="pn-name">User Question</div>
+              <div class="pn-sub">"Why is checkout latency spiking?"</div>
+            </div>
+            <div class="pipe-arrow"></div>
+            <div class="pipe-arrow-tip"></div>
+            <div class="pipe-node highlight">
+              <div class="pn-label">AI BRAIN</div>
+              <div class="pn-name">LLM Agent</div>
+              <div class="pn-sub">Planner · Reasoner</div>
+            </div>
+            <div class="pipe-arrow"></div>
+            <div class="pipe-arrow-tip"></div>
+            <div class="pipe-node">
+              <div class="pn-label">STEP</div>
+              <div class="pn-name">Tool Selection</div>
+              <div class="pn-sub">Chooses the right data source</div>
+            </div>
+          </div>
+
+          <!-- MIDDLE: tool fork -->
+          <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+            <div class="fork-label">AVAILABLE TOOLS</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="tool-card">
+                <div class="tc-tag">METRICS</div>
+                <div class="tc-name">Mimir</div>
+                <div class="tc-query">query_range · PromQL</div>
+                <p>CPU, memory, error-rate, latency histograms across all clusters</p>
+              </div>
+              <div class="tool-card">
+                <div class="tc-tag">LOGS</div>
+                <div class="tc-name">Loki</div>
+                <div class="tc-query">query · LogQL</div>
+                <p>Structured log search, error patterns, trace correlation by label</p>
+              </div>
+              <div class="tool-card">
+                <div class="tc-tag">DASHBOARDS</div>
+                <div class="tc-name">Grafana API</div>
+                <div class="tc-query">search · panels · annotations</div>
+                <p>Dashboard context, existing alerts, annotation timeline</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: outputs -->
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0;min-width:190px;justify-content:center">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--dimmer);letter-spacing:.1em;margin-bottom:4px">OUTPUTS</div>
+            <div class="out-card primary">
+              <div class="oc-tag">STEP 4</div>
+              <h4>Result Aggregation</h4>
+              <p>Correlates signals across all tools into a unified timeline</p>
+            </div>
+            <div class="out-card primary">
+              <div class="oc-tag">STEP 5</div>
+              <h4>Root Cause Explanation</h4>
+              <p>Natural language summary with confidence score and blast radius</p>
+            </div>
+            <div class="out-card">
+              <div class="oc-tag">STEP 6</div>
+              <h4>Remediation Steps</h4>
+              <p>Actionable runbook steps ranked by likelihood of resolving the issue</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ S4: SOLUTION ARCHITECTURE ══════════ -->
+    <div class="slide" id="s4">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="content">
+        <div class="slide-tag reveal r1"><span>03 /</span> WHAT ROOTLENS IS</div>
+        <h2 class="reveal r2">Not a replacement.<br><em>An augmentation layer.</em></h2>
+        <div class="green-rule reveal r3"></div>
+
+        <div class="reveal r4" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px">
+
+          <!-- Left col: the big positioning statement -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="card" style="border-color:rgba(0,200,100,.3);background:rgba(0,200,100,.04)">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--green);letter-spacing:.12em;margin-bottom:8px">CORE PRINCIPLE</div>
+              <p style="font-size:clamp(13px,1.5vw,16px);color:var(--white);line-height:1.55;font-weight:400">RootLens <strong style="color:var(--green);font-weight:500">does not replace Grafana</strong>. It adds an AI reasoning layer that understands telemetry context, service documentation, and incident history — and turns it into answers.</p>
+            </div>
+            <div class="card">
+              <div class="ci">🔒</div>
+              <h3>Data never leaves your network</h3>
+              <p>Telemetry stays inside the internal network. RootLens queries live data on demand — no external data transfer, no compliance risk.</p>
+              <div class="cs">Azure AI Foundry · Azure AI Search · AKS</div>
+            </div>
+            <div class="card">
+              <div class="ci">📋</div>
+              <h3>Grounded, auditable answers</h3>
+              <p>Every response is grounded in real telemetry and traceable to its source. No hallucinations. Leaders can trust and act on what they see.</p>
+              <div class="cs">Incident history · Service docs · Live telemetry</div>
+            </div>
+          </div>
+
+          <!-- Right col: context sources -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--dimmer);letter-spacing:.12em;margin-bottom:2px">WHAT ROOTLENS UNDERSTANDS</div>
+            <div class="card">
+              <div class="ci">📡</div>
+              <h3>Live telemetry</h3>
+              <p>Queries Mimir, Loki, and Tempo on demand — metrics, logs, and traces correlated in real time at the moment of the question.</p>
+            </div>
+            <div class="card">
+              <div class="ci">📚</div>
+              <h3>Service documentation</h3>
+              <p>Indexed via Azure AI Search — architecture docs, runbooks, and service ownership are part of every answer, not an afterthought.</p>
+            </div>
+            <div class="card">
+              <div class="ci">🕑</div>
+              <h3>Incident history</h3>
+              <p>Past incidents inform current diagnosis. RootLens recognises patterns across time and surfaces "we've seen this before" context automatically.</p>
+            </div>
+            <div class="card">
+              <div class="ci">🎭</div>
+              <h3>Stakeholder personas</h3>
+              <p>The same event produces a different answer for an SRE, a platform manager, and an executive — automatically tailored, never manually filtered.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ S5: OUTCOMES ══════════ -->
+    <div class="slide" id="s5">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="content">
+        <div class="slide-tag reveal r1"><span>04 /</span> FOCUSED OUTCOMES</div>
+        <h2 class="reveal r2">Three outcomes.<br>Zero manual effort.</h2>
+        <div class="green-rule reveal r3"></div>
+        <div class="grid-3 reveal r4">
+          <div class="card">
+            <div class="ci">🎭</div>
+            <h3>01 — Persona-based results</h3>
+            <p>SREs see deep technical root-cause chains. Platform managers see business impact. Executives see SLO health. Same data, right lens per role.</p>
+            <div class="cs">Right signal · Right person · Right time</div>
+          </div>
+          <div class="card">
+            <div class="ci">📰</div>
+            <h3>02 — Weekly Observability Newspaper</h3>
+            <p>Auto-generated digest of top incidents, recurring anomalies, SLO breaches, and system health trends — delivered to inbox or Slack every Monday.</p>
+            <div class="cs">Zero manual reporting overhead</div>
+          </div>
+          <div class="card">
+            <div class="ci">🔬</div>
+            <h3>03 — Deep data analysis</h3>
+            <p>Continuous AI analysis surfaces seasonal drift, regression patterns, and capacity signals before they become incidents. Proactive, not reactive.</p>
+            <div class="cs">Shift left on observability</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ S6: VISION ══════════ -->
+    <div class="slide" id="s6">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="content">
+        <div class="slide-tag reveal r1"><span>05 /</span> EXTENDED VISION</div>
+        <h2 class="reveal r2">Beyond infrastructure.<br><em>A platform for all signals.</em></h2>
+        <div class="green-rule reveal r3"></div>
+        <div class="vision-grid reveal r4" style="grid-template-columns:1fr auto 1fr auto 1fr">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="v-ext">
+              <div class="v-ext-tag">IAM ROOTLENS</div>
+              <h4>Identity &amp; Access Observability</h4>
+              <p>Connects with SailPoint IIQ to observe joiner/leaver lifecycle events. Correlate IAM anomalies with infra metrics — detect access risks the moment they create blast radius.</p>
+              <div class="chip-row">
+                <span class="chip">SailPoint IIQ</span>
+                <span class="chip">Joiner / Leaver</span>
+                <span class="chip">Access Risk Scoring</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div class="v-arrow">⟺</div>
+          </div>
+          <div class="v-mid">
+            <div class="v-core">
+              <div style="font-size:18px;margin-bottom:5px">🔍</div>
+              <div class="v-core-name">RootLens Core</div>
+              <div class="v-core-sub">GRAFANA LGTM · AKS</div>
+            </div>
+            <div class="v-ext">
+              <div class="v-ext-tag">AGENT-TO-AGENT</div>
+              <h4>Cross-Domain Orchestration</h4>
+              <p>RootLens agents communicate across namespaces and domains — triggering onboarding flows, handing off context, and coordinating remediation across platform boundaries without human handoffs.</p>
+              <div class="chip-row">
+                <span class="chip">Namespace Handoff</span>
+                <span class="chip">Agent Mesh</span>
+                <span class="chip">Autonomous Orchestration</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div class="v-arrow">⟺</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="v-ext">
+              <div class="v-ext-tag">HR ROOTLENS</div>
+              <h4>People Operations Correlation</h4>
+              <p>Bridge HR signals — org changes, onboarding waves, offboarding — with system load and reliability data. Understand how your human layer impacts platform behaviour.</p>
+              <div class="chip-row">
+                <span class="chip">Workforce Events</span>
+                <span class="chip">Org Change Impact</span>
+                <span class="chip">HR ↔ SRE Bridge</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ S7: CLOSE ══════════ -->
+    <div class="slide" id="s7">
+      <div class="bg-grid"></div>
+      <div class="bg-glow g1"></div>
+      <div class="content">
+        <div class="slide-tag reveal r1"><span>07 /</span> LET'S BUILD IT</div>
+        <h1 class="reveal r2">See your<br>systems.<br><em>Clearly.</em></h1>
+        <div class="close-sub reveal r3">RootLens brings AI-powered root cause analysis to every SRE and platform engineering team — right inside the Grafana stack you already run on AKS.</div>
+        <div class="stat-row reveal r4">
+          <div class="stat-box"><div class="sb-val">↓ MTTR</div><div class="sb-label">Faster incident resolution</div></div>
+          <div class="stat-box"><div class="sb-val">3-in-1</div><div class="sb-label">Metrics · Logs · Traces correlated</div></div>
+          <div class="stat-box"><div class="sb-val">0</div><div class="sb-label">Manual correlation steps</div></div>
+        </div>
+      </div>
+      <div class="footer-line reveal r5">RootLens · Hackathon 2026 · Grafana LGTM + AKS · Ahold Delhaize Platform Engineering</div>
+    </div>
+
+    <!-- ══════════ S8: DEMO HANDOFF ══════════ -->
+    <div class="slide" id="s8">
+      <div class="bg-grid"></div>
+      <div class="bg-glow" style="width:600px;height:600px;background:rgba(0,200,100,.1);top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+      <div class="bg-glow" style="width:300px;height:300px;background:rgba(0,80,200,.07);bottom:-60px;right:-60px"></div>
+      <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%">
+
+        <div class="reveal r1" style="font-family:var(--mono);font-size:10px;color:var(--green);letter-spacing:.22em;margin-bottom:28px">— LIVE DEMO —</div>
+
+        <div class="reveal r2" style="font-family:var(--display);font-size:clamp(52px,8vw,96px);font-weight:800;line-height:.9;letter-spacing:-.03em;color:var(--white);margin-bottom:32px">
+          See it<br><span style="color:var(--green)">live.</span>
+        </div>
+
+        <div class="reveal r3" style="font-size:clamp(13px,1.5vw,17px);color:var(--dim);font-weight:300;max-width:480px;line-height:1.65;margin-bottom:40px">
+          Ask RootLens a real question.<br>Watch it correlate, reason, and answer — live, on our own telemetry.
+        </div>
+
+        <!-- pulsing indicator -->
+        <div class="reveal r4" style="display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;color:var(--green)">
+          <span id="pulse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+          ROOTLENS IS RUNNING
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
+#pulse-dot{animation:pulse 1.8s ease-in-out infinite}
+</style>
+
+<script>
+const slides = Array.from(document.querySelectorAll('.slide'));
+const dotsEl = document.getElementById('dots');
+const progressEl = document.getElementById('progress');
+const curNumEl = document.getElementById('cur-num');
+const totNumEl = document.getElementById('tot-num');
+const total = slides.length;
+let cur = 0, transitioning = false;
+totNumEl.textContent = total;
+
+slides.forEach((_, i) => {
+  const d = document.createElement('button');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.setAttribute('aria-label', 'Slide ' + (i + 1));
+  d.addEventListener('click', () => goTo(i));
+  dotsEl.appendChild(d);
+});
+
+function updateUI() {
+  progressEl.style.width = ((cur + 1) / total * 100) + '%';
+  curNumEl.textContent = cur + 1;
+  Array.from(dotsEl.children).forEach((d, i) => d.classList.toggle('active', i === cur));
+}
+
+function goTo(n) {
+  if (transitioning || n === cur || n < 0 || n >= total) return;
+  transitioning = true;
+  const prev = slides[cur], next = slides[n];
+  const dir = n > cur ? 1 : -1;
+  next.querySelectorAll('.reveal').forEach(el => { el.style.animation = 'none'; el.offsetHeight; el.style.animation = ''; });
+  prev.classList.add('exit-left');
+  prev.classList.remove('active');
+  next.style.transform = `translateX(${dir * 60}px)`;
+  next.style.opacity = '0';
+  next.style.display = 'flex';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    next.classList.add('active');
+    next.style.transform = '';
+    next.style.opacity = '';
+  }));
+  cur = n;
+  updateUI();
+  setTimeout(() => { prev.classList.remove('exit-left'); prev.style.display = ''; transitioning = false; }, 620);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); goTo(cur + 1); }
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); goTo(cur - 1); }
+  if (e.key === 'f' || e.key === 'F') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen().catch(()=>{});
+  }
+  if (e.key === 'Home') goTo(0);
+  if (e.key === 'End')  goTo(total - 1);
+});
+
+let tx = 0;
+document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+document.addEventListener('touchend',   e => { const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 50) goTo(dx < 0 ? cur + 1 : cur - 1); }, { passive: true });
+
+updateUI();
+</script>
+</body>
+</html>
